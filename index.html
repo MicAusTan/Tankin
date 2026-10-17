@@ -52,7 +52,7 @@ small{color:#8d97ad}
    <button class="alt" id="addbot">+ Bot</button><button class="alt" id="rmlast">Remove last</button>
    <button class="alt" id="resetsc">Reset scores</button>
    <select id="modesel"></select>
-   <select id="mapsel"></select><select id="szsel"></select><select id="budsel"></select><select id="hpsel"></select><select id="trsel"></select><select id="drawsel"></select><select id="traitsel"></select>
+   <select id="mapsel"></select><select id="szsel"></select><select id="budsel"></select><select id="hpsel"></select><select id="trsel"></select><select id="drawsel"></select><select id="traitsel"></select><select id="windsel"></select><select id="cratesel"></select>
    <button id="start">Start game</button>
   </div>
   <small id="waitmsg"></small>
@@ -93,9 +93,10 @@ const WEAPONS=[
  {d:'Rolls along the ground after landing, exploding on contact or at a steep slope.',name:'Roller',r:38,dmg:40,cost:2,roll:1,tags:['rolling']},
  {d:'You heal for 60% of the damage you deal.',name:'Vampire Shell',r:35,dmg:38,cost:3,vamp:1,tags:['vampire']},
  {d:'Splits into 5 small bomblets at the top of its arc.',name:'Cluster Bomb',r:22,dmg:18,cost:3,split:1,kids:5,tags:['explosive','cluster']},
- {d:'Flies perfectly straight: no arc, no wind, fixed speed. Pierces thin terrain.',name:'Sniper Shell',r:14,dmg:60,cost:2,nowind:1,straight:1,pierce:30,tags:['precision']},
+ {d:'Flies perfectly straight: no arc, no wind, fixed speed. Pierces thin terrain.',name:'Sniper Shell',r:14,dmg:60,cost:2,nowind:1,straight:1,pierce:80,tags:['precision']},
  {d:'Poisons tanks in the cloud: 8 damage per turn for 3 turns.',name:'Poison Shell',r:34,dmg:15,cost:2,psn:1,tags:['poison']},
- {d:'Bores through terrain in a straight line, slowly. Explodes when it breaks out the far side, hits a tank, or runs out of drill.',name:'Drill',r:45,dmg:50,cost:3,drill:170,tags:['drill']}
+ {d:'Really bores through terrain (about 480px), through hills and out the other side, carving a real tunnel behind it. Explodes on a tank, after a gap of open air, or when it runs out.',name:'Drill',r:45,dmg:50,cost:3,drill:480,tags:['drill']},
+ {d:'Ghost shell: passes through terrain and arcs UPWARD (reverse gravity). It only explodes when it reaches a tank, otherwise it flies away.',name:'Phantom Shot',r:42,dmg:50,cost:3,phantom:1,tags:['phantom']}
 ];
 /* Traits: global (hp,fuel,gdmg,armor) and/or weapon-tag based (tag + dmg/r/free) */
 const TRAITS=[
@@ -118,9 +119,10 @@ const TRAITS=[
  {name:'Climber',climb:9,d:'walk up much steeper slopes'},
  {name:'Double Tap',twin:1,d:'after each shot, a bonus Shell shot (60% damage)'},
  {name:'Wild Cannon',jit:1,gdmg:1.3,d:'+30% damage, but your shots wobble'},
- {name:'Burrower',pierce:28,d:'your shells tunnel through ~28px of terrain'},
+ {name:'Burrower',pierce:50,d:'your shells tunnel through ~50px of terrain'},
  {name:'Berserker',berserk:.5,d:'+50% damage while below half HP'},
  {name:'Escalation',grow:.06,d:'blast radius +6% per turn survived (max +50%)'},
+ {name:'Haunter',tag:'phantom',dmg:1.4,r:1.2,free:1,d:'phantom shots +40% dmg, bigger blast, +1 free'},
  {name:'Miner',tag:'drill',dmg:1.4,r:1.2,free:1,d:'drills +40% dmg, bigger blast, +1 free'}
 ];
 const KC={heal:'#4ade80',shield:'#60a5fa',tele:'#c084fc'};
@@ -138,7 +140,7 @@ function drawHat(c,x,y,h){
   c.restore();
 }
 const HANDMAX=4;
-const MAPS=['Hills','Flat','Canyon','Mountains','Death Pits','Twin Peaks','Staircase','Bowl','Archipelago','Dunes','Great Wall'];
+const MAPS=['Hills','Flat','Canyon','Mountains','Death Pits','Twin Peaks','Staircase','Bowl','Archipelago','Dunes','Great Wall','Sky Islands','Tunnel Mountain','Swiss Cheese','Floating Rocks'];
 const tmatch=(p,w)=>{const t=TRAITS[p.trait];return t.tag&&w.tags.includes(t.tag)?t:{}};
 let budget=10;
 const FUEL=100,MAXAMMO=5,MAXHIT=90;
@@ -155,7 +157,7 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const show=id=>document.querySelectorAll('.scr').forEach(e=>e.hidden=e.id!==id);
 
-let peer,conns=[],hostConn=null,isHost=false,myId='host',code='',lobby=[],G=null,mapStyle=-1,teamMode=false,mapW=960,hpSet=1,terMode=0,drawVal=0,traitMode=0,draft=null,draftData=null;
+let peer,conns=[],hostConn=null,isHost=false,myId='host',code='',lobby=[],G=null,mapStyle=-1,teamMode=false,mapW=960,hpSet=1,terMode=0,drawVal=0,traitMode=0,draft=null,draftData=null,windSet=1,crateFreq=1;
 
 /* ---------- terrain ---------- */
 function rng(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
@@ -178,43 +180,119 @@ function genTerrain(seed,st){
     if(st===8){const sw=W/5,m=x%sw,id=Math.min(4,Math.floor(x/sw));y=isl[id]+(y-H*.6)*.15;pit=(m<26&&id>0)||(m>sw-26&&id<4)}
     if(st===9)y=H*.62+(y-H*.6)*.35+28*Math.sin(u*6.28*9*fk+f[0][0])+16*Math.sin(u*6.28*17*fk+f[1][0]);
     if(st===10)y=H*.72+(y-H*.6)*.25-320*Math.exp(-(((u-.5)/.04)**4));
-    ys[x]=pit?H:Math.max(st===3||st===5||st===10?100:150,Math.min(H-60,y));
+    if(st===11)pit=true;
+    if(st===12)y=H*.8+(y-H*.6)*.12-340*g(.5,.2);
+    ys[x]=pit?H:Math.max(st===3||st===5||st===10||st===12?100:150,Math.min(H-60,y));
   }
   return ys;
 }
-function platform(ys,x){const l=Math.min(ys[x],H-80);for(let i=x-20;i<=x+20;i++)ys[i]=l}
-function applyTerrain(ys,t){
+const solidM=(m,x,y)=>{x|=0;y|=0;return x>=0&&x<W&&y>=0&&y<H&&m[y*W+x]===1};
+const solid=(x,y)=>solidM(G.m,x,y);
+function topY(m,x){x=Math.max(0,Math.min(W-1,x|0));for(let y=0;y<H;y++)if(m[y*W+x])return y;return H}
+function restM(m,x,y){
+  x=Math.max(0,Math.min(W-1,Math.round(x)));y=Math.max(0,Math.min(H-1,Math.round(y)));
+  if(m[y*W+x]){while(y>0&&m[(y-1)*W+x])y--;return y}
+  while(y<H&&!m[y*W+x])y++;
+  return y>=H?H:y;
+}
+function fillM(m,cx,cy,r,v){
+  const x0=Math.max(0,Math.floor(cx-r)),x1=Math.min(W-1,Math.ceil(cx+r)),y0=Math.max(0,Math.floor(cy-r)),y1=Math.min(H-1,Math.ceil(cy+r)),r2=r*r;
+  for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){const dx=x-cx,dy=y-cy;if(dx*dx+dy*dy<=r2)m[y*W+x]=v}
+  return[x0,y0,x1,y1];
+}
+const carveM=(m,cx,cy,r)=>fillM(m,cx,cy,r,0),bumpM=(m,cx,cy,r)=>fillM(m,cx,cy,r,1);
+function flatten(m,x,L){
+  for(let i=Math.max(0,x-20);i<=Math.min(W-1,x+20);i++){
+    for(let y=Math.max(0,L-40);y<L;y++)m[y*W+i]=0;
+    for(let y=L;y<=Math.min(H-1,L+14);y++)m[y*W+i]=1;
+  }
+}
+function shiftM(m,t){
+  const col=new Uint8Array(H);
   for(let x=0;x<W;x++){
-    if(ys[x]>=H-1)continue;
+    let any=false;for(let y=0;y<H;y++){col[y]=m[y*W+x];if(col[y])any=true}
+    if(!any)continue;
     const d=t.m===1?-14:t.m===2?14:Math.round(Math.sin(x*.025+t.ph)*16);
-    ys[x]=Math.max(90,Math.min(H,ys[x]+d));
+    if(!d)continue;
+    for(let y=0;y<H;y++){const s2=y-d;m[y*W+x]=s2<0?0:s2>=H?col[H-1]:col[s2]}
   }
 }
-function bump(ys,cx,cy,r){
-  for(let x=Math.max(0,Math.floor(cx-r));x<=Math.min(W-1,Math.ceil(cx+r));x++){
-    const d=r*r-(x-cx)*(x-cx);if(d<0)continue;
-    const top=cy-Math.sqrt(d);if(top<ys[x])ys[x]=Math.max(40,top);
+function buildMask(seed,st){
+  const ys=genTerrain(seed,st),m=new Uint8Array(W*H),r=rng((seed^0x5bd1e995)|0);
+  for(let x=0;x<W;x++){const t=Math.max(0,Math.floor(ys[x]));for(let y=t;y<H;y++)m[y*W+x]=1}
+  const blob=(cx,cy,rx,ry,ph)=>{
+    for(let y=Math.max(0,Math.floor(cy-ry));y<Math.min(H,cy+ry*1.6);y++)for(let x=Math.max(0,Math.floor(cx-rx*1.2));x<Math.min(W,cx+rx*1.2);x++){
+      const dx=(x-cx)/rx,dy=(y-cy)/(y<cy?ry*.5:ry*1.5);
+      if(dx*dx+dy*dy<1+.18*Math.sin(Math.atan2(y-cy,x-cx)*3+ph))m[y*W+x]=1;
+    }
+  };
+  if(st===11){const n=Math.max(5,Math.round(W/170));for(let i=0;i<n;i++)blob(W*(i+.5)/n+(r()-.5)*40,190+r()*200,60+r()*50,22+r()*14,r()*6.28)}
+  if(st===12){
+    const ty=Math.round(H*.8)-26;
+    for(let x=Math.round(W*.2);x<=Math.round(W*.8);x+=5)carveM(m,x,ty,26);
+    for(let i=0;i<3;i++)carveM(m,W*(.38+.12*i)+(r()-.5)*30,ty-70-r()*70,28+r()*16);
   }
+  if(st===13){const n=Math.round(W/65);for(let i=0;i<n;i++)carveM(m,r()*W,200+r()*260,20+r()*32)}
+  if(st===14){const n=Math.max(4,Math.round(W/190));for(let i=0;i<n;i++)blob(W*(i+.5)/n+(r()-.5)*60,70+r()*130,40+r()*40,14+r()*10,r()*6.28)}
+  return m;
 }
-function carve(ys,cx,cy,r){
-  for(let x=Math.max(0,Math.floor(cx-r));x<=Math.min(W-1,Math.ceil(cx+r));x++){
-    const d=r*r-(x-cx)*(x-cx);if(d<0)continue;
-    const dy=Math.sqrt(d);
-    if(cy+dy>ys[x]&&cy-dy<=ys[x])ys[x]=Math.min(H,cy+dy);
+/* painting: offscreen canvas holds the terrain pixels (dirt gradient + grass on top-facing edges) */
+let TC=null,TIMG=null,TX=null;
+const CAN=typeof ImageData!=='undefined';
+function paintRect(x0,y0,x1,y1){
+  if(!CAN||!TIMG)return;
+  x0=Math.max(0,x0|0);y0=Math.max(0,y0|0);x1=Math.min(W-1,x1|0);y1=Math.min(H-1,y1|0);
+  if(x1<x0||y1<y0)return;
+  const d=TIMG.data,m=G.m;
+  for(let x=x0;x<=x1;x++){
+    let cnt=0;while(cnt<8&&y0-1-cnt>=0&&m[(y0-1-cnt)*W+x])cnt++;
+    for(let y=y0;y<=y1;y++){
+      const i=(y*W+x)*4;
+      if(m[y*W+x]){
+        let rr,gg,bb;
+        if(cnt<3){rr=109;gg=187;bb=74}else if(cnt<7){rr=79;gg=154;bb=55}
+        else{const t=Math.min(1,Math.max(0,(y-100)/(H-100)));rr=138-80*t|0;gg=98-57*t|0;bb=64-40*t|0}
+        d[i]=rr;d[i+1]=gg;d[i+2]=bb;d[i+3]=255;cnt++;
+      }else{d[i+3]=0;cnt=0}
+    }
   }
+  TX.putImageData(TIMG,0,0,x0,y0,x1-x0+1,y1-y0+1);
+}
+function paintAll(){
+  if(!CAN)return;
+  TC=document.createElement('canvas');TC.width=W;TC.height=H;TX=TC.getContext('2d');TIMG=TX.createImageData(W,H);
+  paintRect(0,0,W-1,H-1);
+}
+function settleAll(){
+  G.pl.forEach(q=>{q.y=restM(G.m,q.x,q.y)});
+  G.crates.forEach(c=>{c.gy=restM(G.m,c.x,c.gy)});
+}
+function walkStep(p,dir,climbMax){
+  const nx=p.x+dir;if(nx<10||nx>W-10)return 0;
+  for(let r=p.y-climbMax;r<=p.y+20;r++){
+    if(solid(nx,r)&&!solid(nx,r-1)&&!solid(nx,r-3)&&!solid(nx,r-6)&&!solid(nx,r-10)){
+      if(r>=H-8)return 0;
+      const climb=p.y-r;p.x=nx;p.y=r;return climb>1?2:1;
+    }
+  }
+  return 0;
 }
 
 /* ---------- game state ---------- */
 function startGame(m){
   W=m.W||960;cam={z:Math.max(960/W,.8),x:W/2,y:H/2,hold:0};hpMul=m.hpm||1;
-  G={ys:genTerrain(m.seed,m.map),pl:m.players.map((p,i)=>({...p,team:m.tm?i%2:i,maxhp:hpOf(p),hp:hpOf(p),ammo:m.dm?WEAPONS.map((w,i)=>i?0:-1):p.load.map((n,i)=>i?n+(tmatch(p,WEAPONS[i]).free||0):-1)})),turn:m.turn,wind:m.wind,
-     angle:0,power:50,weapon:0,tm:m.tm,dm:m.dm,anim:null,fx:[],floats:[],msgs:[],over:-1,wait:false};
-  G.pl.forEach(p=>{while(G.ys[p.x]>=H-1&&p.x<W-30)p.x+=10;platform(G.ys,p.x)});setAim();show('gamescr');$('newgame').hidden=!isHost;
+  G={m:buildMask(m.seed,m.map),pl:m.players.map((p,i)=>({...p,team:m.tm?i%2:i,maxhp:hpOf(p),hp:hpOf(p),ammo:m.dm?WEAPONS.map((w,i)=>i?0:-1):p.load.map((n,i)=>i?n+(tmatch(p,WEAPONS[i]).free||0):-1)})),turn:m.turn,wind:m.wind,
+     angle:0,power:50,weapon:0,tm:m.tm,dm:m.dm,anim:null,fx:[],floats:[],msgs:[],crates:[],cid:0,over:-1,wait:false};
+  G.pl.forEach(p=>{
+    const x0=p.x;let best=null;
+    for(let d=0;d<W&&best==null;d+=4)for(const sx of[x0+d,x0-d])if(sx>=30&&sx<W-30&&topY(G.m,sx)<H-90){best=sx;break}
+    p.x=best==null?x0:best;const L=Math.min(topY(G.m,p.x),H-80);flatten(G.m,p.x,L);p.y=L;
+  });paintAll();setAim();show('gamescr');$('newgame').hidden=!isHost;
 }
 function setAim(){
   const p=G.pl[G.turn];
   G.angle=p.la??(p.x<W/2?55:125);G.power=p.lp??50;G.weapon=(p.lw!=null&&p.ammo[p.lw]!==0)?p.lw:0;if(G.bonus)G.weapon=0;
-  G.fuel=fuelOf(p);G.sx=p.x;G.t0=performance.now();cam.hold=0;renderW();
+  G.fuel=fuelOf(p);G.sx=p.x;G.sy=p.y;G.t0=performance.now();cam.hold=0;renderW();
 }
 function clampCam(){
   const z=cam.z,hw=480/z,hh=270/z;
@@ -225,7 +303,7 @@ function camUpdate(){
   let tx=null,ty=null;
   if(performance.now()>cam.hold){
     if(G.anim){const P=G.anim.m.paths[0];if(P&&P.length){const k=Math.min(Math.floor(G.anim.i),P.length-1);tx=P[k][0];ty=P[k][1]}}
-    else if(G.over===-1){const p=G.pl[G.turn];tx=p.x;ty=G.ys[p.x]-60}
+    else if(G.over===-1){const p=G.pl[G.turn];tx=p.x;ty=p.y-60}
   }
   if(tx!=null){cam.x+=(tx-cam.x)*.1;cam.y+=(ty-cam.y)*.1}
   clampCam();
@@ -238,11 +316,12 @@ function zoomAt(cx,cy,f){
   cam.x=wx-(mx-480)/cam.z;cam.y=wy-(my-270)/cam.z;
   cam.hold=performance.now()+4000;clampCam();
 }
-function sendAim(){const p=G.pl[G.turn],m={t:'aim',x:p.x,a:G.angle,pw:G.power,w:G.weapon};if(isHost)broadcast(m);else hostConn.send(m)}
+function sendAim(){const p=G.pl[G.turn],m={t:'aim',x:p.x,y:p.y,a:G.angle,pw:G.power,w:G.weapon};if(isHost)broadcast(m);else hostConn.send(m)}
 function applyAim(d){
   if(!G||G.anim||G.pl[G.turn].owner===myId)return;
   const p=G.pl[G.turn],fm=fuelOf(p);
   p.x=Math.min(W-10,Math.max(10,Math.min(G.sx+fm,Math.max(G.sx-fm,Math.round(d.x)))));
+  p.y=restM(G.m,p.x,isFinite(d.y)?d.y:p.y);
   G.angle=+d.a;G.power=+d.pw;if(WEAPONS[d.w])G.weapon=d.w;
 }
 function cycleW(d){const n=WEAPONS.length;for(let k=1;k<=n;k++){const j=(G.weapon+d*k+n*n)%n;if(G.pl[G.turn].ammo[j]!==0){pickW(j);return}}}
@@ -285,14 +364,18 @@ function botTurn(){
   const atk=have.filter(j=>!WEAPONS[j].kind&&!WEAPONS[j].add);
   const selfHeal=heal!=null&&p.hp<p.maxhp*.5&&Math.random()<.7;
   const wi=G.bonus?0:selfHeal?heal:atk[Math.random()*atk.length|0];
-  if(Math.random()<.5){
-    const dir=Math.random()<.5?-1:1;let n=Math.floor(Math.random()*fuelOf(p)*.4);
-    while(n-->0){const nx=p.x+dir;if(nx<10||nx>W-10||G.ys[p.x]-G.ys[nx]>3||G.ys[nx]>=H-1)break;p.x=nx}
+  {
+    const cr=G.crates.slice().sort((a,b)=>Math.abs(a.x-p.x)-Math.abs(b.x-p.x))[0];
+    const goCrate=cr&&Math.abs(cr.x-p.x)<fuelOf(p)*.9&&Math.random()<.8;
+    if(goCrate||Math.random()<.5){
+    const dir=goCrate?Math.sign(cr.x-p.x)||1:Math.random()<.5?-1:1;let n=goCrate?Math.abs(cr.x-p.x):Math.floor(Math.random()*fuelOf(p)*.4);
+    while(n-->0){if(!walkStep(p,dir,3))break}
+    }
   }
   const base=WEAPONS[wi],t=tmatch(p,base),tr=TRAITS[p.trait];
   const wf={...base,r:Math.round((base.r||0)*(t.r||1)*(1+Math.min(.5,(tr.grow||0)*(p.shots||0)))),pierce:(tr.pierce&&!base.bounce&&!base.roll&&!base.add&&!base.kind)?tr.pierce:base.pierce,dmg:Math.round((base.dmg||0)*(t.dmg||1)),heal:Math.round((base.heal||0)*(t.dmg||1))};
-  const tx=selfHeal?p.x:tgt.x,ty=selfHeal?G.ys[p.x]:G.ys[tgt.x]-6,right=tx>=p.x;
-  const direct=Math.atan2(G.ys[p.x]-12-ty,tx-p.x)*180/Math.PI;
+  const tx=selfHeal?p.x:tgt.x,ty=selfHeal?p.y:tgt.y-6,right=tx>=p.x;
+  const direct=Math.atan2(p.y-12-ty,tx-p.x)*180/Math.PI;
   let best=null,bd=1e9;
   for(let k=0;k<70;k++){
     let ang=wf.straight?direct+(Math.random()-.5)*30:k<50?(right?20+Math.random()*70:90+Math.random()*70):Math.random()*180;
@@ -301,7 +384,7 @@ function botTurn(){
   }
   if(!best)best=[right?55:125,50];
   const ang=Math.min(180,Math.max(0,best[0]+(Math.random()-.5)*6)),pow=Math.min(100,Math.max(10,best[1]*(1+(Math.random()-.5)*.08)));
-  hostFire(ang,pow,wi,p.x);
+  hostFire(ang,pow,wi,p.x,p.y);
 }
 function buildDeck(p){
   const d=[];
@@ -332,7 +415,8 @@ function turnDraw(i){
   syncHands();
 }
 function initDraw(){G.pl.forEach(p=>{p.deck=buildDeck(p);p.tc=0;p.lock=0});turnDraw(G.turn)}
-function hostSkip(){const m={t:'skip',next:nextAlive(G.turn),wind:+(Math.random()*2-1).toFixed(2)};broadcast(m);applySkip(m);if(G.dm){turnDraw(G.turn);renderW()}}
+function rndWind(){return +((Math.random()*2-1)*windSet).toFixed(2)}
+function hostSkip(){const m={t:'skip',next:nextAlive(G.turn),wind:rndWind()};broadcast(m);applySkip(m);if(G.dm){turnDraw(G.turn);renderW()}}
 function applySkip(m){G.bonus=false;G.turn=m.next;G.wind=m.wind;G.pl[G.turn].shield=false;G.wait=false;setAim()}
 function renderW(){
   const p=G.pl[G.turn];
@@ -343,12 +427,7 @@ function renderW(){
 function move(dx){
   if(!canAct())return;
   const p=G.pl[G.turn],dir=Math.sign(dx);let n=Math.abs(dx);
-  while(n-->0&&G.fuel>0){
-    const nx=p.x+dir;if(nx<10||nx>W-10)break;
-    const climb=G.ys[p.x]-G.ys[nx];
-    if(climb>(TRAITS[p.trait].climb||3))break;
-    p.x=nx;G.fuel-=climb>1?2:1;
-  }
+  while(n-->0&&G.fuel>0){const c=walkStep(p,dir,TRAITS[p.trait].climb||3);if(!c)break;G.fuel-=c}
 }
 function pickW(i){if(canAct()&&WEAPONS[i]&&G.pl[G.turn].ammo[i]!==0&&(!G.bonus||i===0)){G.weapon=i;renderW()}}
 function nextAlive(from){for(let k=1;k<=G.pl.length;k++){const j=(from+k)%G.pl.length;if(G.pl[j].hp>0)return j}return from}
@@ -366,52 +445,68 @@ function dropPlayer(o){
 const canAct=()=>G&&G.over===-1&&!G.anim&&!G.wait&&G.pl[G.turn].owner===myId;
 
 /* Deterministic shot simulation (host only) */
-let LM=[];
+let LM=[],SH=null;
 function flight(x,y,vx,vy,wind,w,split){
-  const path=[[Math.round(x),Math.round(y)]],mids=(LM=[]);let bn=w.bounce||0,pv=vy,pen=0;
+  const R=Math.round,path=[[R(x),R(y)]],mids=(LM=[]);let bn=w.bounce||0,pv=vy,pen=0;
+  const mk=(bx,by)=>({x:R(bx),y:R(by),r:w.r,dmg:w.dmg,add:w.add,kind:w.kind,heal:w.heal,psn:w.psn});
+  const march=(a,b,c,d)=>{const n=Math.max(1,Math.ceil(Math.hypot(c-a,d-b)/3));for(let k=1;k<=n;k++){const px=a+(c-a)*k/n,py=b+(d-b)*k/n;if(solid(px,py))return[px,py]}return null};
   for(let i=0;i<4000;i++){
-    vx+=wind*0.02;vy+=w.straight?0:0.12;x+=vx;y+=vy;
-    if(i%2===0)path.push([Math.round(x),Math.round(y)]);
-    if(split&&pv<0&&vy>=0){path.push([Math.round(x),Math.round(y)]);return{path,boom:null,apex:[x,y,vx,vy]}}
+    const ox=x,oy=y;
+    vx+=wind*0.02;vy+=w.straight?0:w.phantom?-0.12:0.12;x+=vx;y+=vy;
+    if(i%2===0)path.push([R(x),R(y)]);
+    if(split&&pv<0&&vy>=0){path.push([R(x),R(y)]);return{path,boom:null,apex:[x,y,vx,vy]}}
     pv=vy;
     if(x<0||x>=W||y>H+50)return{path,boom:null};
-    let hit=y>=G.ys[x|0];
+    if(w.phantom&&y<-1200)return{path,boom:null};
+    const hit=w.phantom?null:march(ox,oy,x,y);
     if(hit&&w.drill){
-      const sp=Math.hypot(vx,vy)||1,dx=vx/sp*4,dy=vy/sp*4;let used=0;
-      mids.push({k:path.length-1,b:{x:Math.round(x),y:Math.round(y),r:16,dmg:0,nodmg:1}});
+      x=hit[0];y=hit[1];
+      const sp=Math.hypot(vx,vy)||1,dx=vx/sp*4,dy=vy/sp*4;let used=0,air=0;
+      const bm=()=>({path,boom:mk(x,Math.min(y,H-8))});
+      mids.push({k:path.length-1,b:{x:R(x),y:R(y),r:20,dmg:0,nodmg:1}});
       for(let k=0;k<400;k++){
-        x+=dx;y+=dy;used+=4;path.push([Math.round(x),Math.round(y)]);
-        if(x<2||x>=W-2||y>H+30)return{path,boom:null};
-        if(k%3===2)mids.push({k:path.length-1,b:{x:Math.round(x),y:Math.round(y),r:15,dmg:0,nodmg:1}});
-        const out=y<G.ys[x|0],tk=G.pl.some(q=>q.hp>0&&Math.hypot(q.x-x,G.ys[q.x]-6-y)<16);
-        if(out||tk||used>=w.drill)return{path,boom:{x:Math.round(x),y:Math.round(y),r:w.r,dmg:w.dmg}};
+        x+=dx;y+=dy;used+=4;path.push([R(x),R(Math.min(y,H))]);
+        if(x<2||x>=W-2)return{path,boom:null};
+        if(y>H-8)return bm();
+        const out=!solid(x,y);air=out?air+1:0;
+        if(k%3===2&&!out)mids.push({k:path.length-1,b:{x:R(x),y:R(y),r:20,dmg:0,nodmg:1}});
+        const tk=G.pl.some(q=>q.hp>0&&Math.hypot(q.x-x,q.y-6-y)<16);
+        if(air>12||tk||used>=w.drill)return bm();
       }
-      return{path,boom:{x:Math.round(x),y:Math.round(y),r:w.r,dmg:w.dmg}};
+      return bm();
     }
     if(hit&&w.pierce){
-      if(pen===0)mids.push({k:path.length-1,b:{x:Math.round(x),y:Math.round(y),r:12,dmg:0,nodmg:1}});
+      if(pen===0)mids.push({k:path.length-1,b:{x:R(hit[0]),y:R(hit[1]),r:12,dmg:0,nodmg:1}});
       pen+=Math.hypot(vx,vy);
       if(pen<=w.pierce)continue;
     }
-    if(hit&&bn>0){bn--;const by=G.ys[x|0];y=by-2;vy=-Math.abs(vy)*0.75;vx*=0.85;path.push([Math.round(x),Math.round(y)]);mids.push({k:path.length-1,b:{x:Math.round(x),y:Math.round(by),r:Math.round(w.r*.8),dmg:Math.round(w.dmg*.6)}});continue}
-    if(hit&&w.roll){
-      let dir=vx>=0?1:-1,xx=Math.round(x);
-      for(let k=0;k<160;k++){
-        const nx=xx+dir;if(nx<1||nx>=W-1||G.ys[nx]-G.ys[xx]<-7)break;
-        xx=nx;const ry=G.ys[xx]-2;if(k%2===0)path.push([xx,Math.round(ry)]);
-        if(G.pl.some(q=>q.hp>0&&Math.abs(q.x-xx)<12&&Math.abs(G.ys[q.x]-6-ry)<14))break;
-      }
-      const ry=Math.round(G.ys[xx]-2);path.push([xx,ry]);
-      return{path,boom:{x:xx,y:ry,r:w.r,dmg:w.dmg}};
+    if(hit&&bn>0){
+      bn--;const bx=hit[0],by=hit[1];x=bx;y=by;let g=0;while(solid(x,y)&&y>0&&g++<40)y--;y-=2;
+      vy=-Math.abs(vy)*0.75;vx*=0.85;path.push([R(x),R(y)]);
+      mids.push({k:path.length-1,b:{x:R(bx),y:R(by),r:R(w.r*.8),dmg:R(w.dmg*.6)}});continue;
     }
-    if(!hit&&i>10)for(const q of G.pl)if(q.hp>0&&Math.hypot(q.x-x,G.ys[q.x]-6-y)<14)hit=true;
-    if(hit){path.push([Math.round(x),Math.round(y)]);return{path,boom:{x:Math.round(x),y:Math.round(y),r:w.r,dmg:w.dmg,add:w.add,kind:w.kind,heal:w.heal,psn:w.psn}}}
+    if(hit&&w.roll){
+      x=hit[0];y=hit[1];let g=0;while(solid(x,y)&&y>0&&g++<60)y--;
+      let xx=R(x),sy=R(y)+1;const dir=vx>=0?1:-1;
+      for(let k=0;k<160;k++){
+        const nx=xx+dir;if(nx<1||nx>=W-1)break;
+        let ny=null;for(let r=sy-8;r<=sy+10;r++){if(solid(nx,r)&&!solid(nx,r-1)){ny=r;break}}
+        if(ny===null||ny<sy-7)break;
+        xx=nx;sy=ny;if(k%2===0)path.push([xx,sy-2]);
+        if(G.pl.some(q=>q.hp>0&&Math.abs(q.x-xx)<12&&Math.abs(q.y-6-(sy-2))<14))break;
+      }
+      path.push([xx,sy-2]);return{path,boom:mk(xx,sy-2)};
+    }
+    let th=false;
+    if(!hit)for(const q of G.pl)if(q.hp>0&&(i>10||q!==SH)&&Math.hypot(q.x-x,q.y-6-y)<(w.phantom?24:14))th=true;
+    if(hit||th){const bx=hit?hit[0]:x,by=hit?hit[1]:y;path.push([R(bx),R(by)]);return{path,boom:mk(bx,by)}}
   }
   return{path,boom:null};
 }
 function simulate(p,angle,power,wind,w){
+  SH=p;
   const go=(ang,ww)=>{const a=ang*Math.PI/180,sp=ww.straight?12:power*0.16;
-    const f=flight(p.x+Math.cos(a)*16,G.ys[p.x]-12-Math.sin(a)*16,Math.cos(a)*sp,-Math.sin(a)*sp,ww.nowind?0:wind,ww,!!ww.split);f.mids=LM;return f};
+    const f=flight(p.x+Math.cos(a)*16,p.y-12-Math.sin(a)*16,Math.cos(a)*sp,-Math.sin(a)*sp,ww.nowind?0:wind,ww,!!ww.split);f.mids=LM;return f};
   if(w.multi)return[-8,0,8].map(d=>go(angle+d,w));
   const f=go(angle,w);
   if(w.strike){
@@ -425,40 +520,67 @@ function simulate(p,angle,power,wind,w){
   for(const d of w.kids===5?[-3,-1.5,0,1.5,3]:[-1.6,0,1.6])out.push(flight(ax,ay,avx+d,avy,wind,{...w,split:0},false));
   return out;
 }
-function hostFire(angle,power,wi,x){
+function hostFire(angle,power,wi,x,y){
   const p=G.pl[G.turn],fm=fuelOf(p),i0=G.turn;
   if(!WEAPONS[wi]||p.ammo[wi]===0||G.bonus)wi=0;
   x=isFinite(x)?Math.round(x):G.sx;
   x=Math.min(W-10,Math.max(10,Math.min(G.sx+fm,Math.max(G.sx-fm,x))));
   const base=WEAPONS[wi],t=tmatch(p,base),tr=TRAITS[p.trait];
   const w={...base,r:Math.round((base.r||0)*(t.r||1)*(1+Math.min(.5,(tr.grow||0)*(p.shots||0)))),pierce:(tr.pierce&&!base.bounce&&!base.roll&&!base.add&&!base.kind)?tr.pierce:base.pierce,dmg:Math.round((base.dmg||0)*(t.dmg||1)),heal:Math.round((base.heal||0)*(t.dmg||1))};
-  const hp=G.pl.map(q=>q.hp),sh=G.pl.map(q=>!!q.shield),pings=[],ys2=G.ys.slice(),ps=G.pl.map(q=>q.poison||0),taken=G.pl.map(()=>0);
-  p.x=x;
+  const hp=G.pl.map(q=>q.hp),sh=G.pl.map(q=>!!q.shield),pings=[],m2=G.m.slice(),ps=G.pl.map(q=>q.poison||0),taken=G.pl.map(()=>0);
+  p.x=x;p.y=restM(G.m,x,isFinite(y)?y:G.sy);
   if(tr.jit){angle+=(Math.random()-.5)*8;power=Math.min(100,Math.max(5,power*(1+(Math.random()-.5)*.24)))}
   p.shots=(p.shots||0)+1;
   const fl=simulate(p,angle,power,G.wind,w);
-  let tx=null,dealt=0;
+  let tx=null,ty=null,dealt=0;
   fl.flatMap(f=>[...(f.mids||[]).map(e=>e.b),f.boom]).forEach(b=>{if(!b)return;
-    if(b.add){bump(ys2,b.x,b.y,b.r);return}
-    if(b.nodmg){carve(ys2,b.x,b.y,b.r);return}
-    if(b.kind==='tele'){if(G.ys[b.x]<H-90&&G.pl.every((q,i)=>i===i0||q.hp<=0||Math.abs(q.x-b.x)>30))tx=Math.max(10,Math.min(W-10,b.x));return}
+    if(b.add){bumpM(m2,b.x,b.y,b.r);return}
+    if(b.nodmg){carveM(m2,b.x,b.y,b.r);return}
+    if(b.kind==='tele'){const gy0=restM(G.m,b.x,b.y);if(gy0<H-60&&G.pl.every((q,i)=>i===i0||q.hp<=0||Math.abs(q.x-b.x)>30)){tx=Math.max(10,Math.min(W-10,b.x));ty=restM(G.m,tx,b.y)}return}
     if(b.kind){
       G.pl.forEach((q,i)=>{if(q.hp<=0)return;
-        const d=Math.hypot(q.x-b.x,G.ys[q.x]-6-b.y);
+        const d=Math.hypot(q.x-b.x,q.y-6-b.y);
         if(d<b.r+22){if(b.kind==='shield')sh[i]=true;else hp[i]=Math.min(q.maxhp,hp[i]+Math.max(1,Math.round(b.heal*(1-d/(b.r+22)))))}});
       return;
     }
-    carve(ys2,b.x,b.y,b.r);
+    carveM(m2,b.x,b.y,b.r);
     G.pl.forEach((q,i)=>{if(q.hp<=0)return;
-      const d=Math.hypot(q.x-b.x,G.ys[q.x]-6-b.y);
+      const d=Math.hypot(q.x-b.x,q.y-6-b.y);
       if(d<b.r+22){if(b.psn)ps[i]=3;const dm=Math.max(1,Math.round(b.dmg*(tr.gdmg||1)*(1+(p.hp<p.maxhp*.5?(tr.berserk||0):0))*(G.bonus?.6:1)*(TRAITS[q.trait].armor||1)*(sh[i]?.4:1)*(1-d/(b.r+22))));taken[i]+=dm}});
   });
   taken.forEach((t,i)=>{const c=Math.min(MAXHIT,t);hp[i]-=c;if(i!==i0)dealt+=c});
   if(w.vamp)hp[i0]=Math.min(p.maxhp,hp[i0]+Math.round(dealt*.6));
   let nx0=i0;for(let k=1;k<=G.pl.length;k++){const j=(i0+k)%G.pl.length;if(G.pl[j].hp>0){nx0=j;break}}
   const ter=terMode>0&&nx0<=i0&&!(tr.twin&&!G.bonus)?{m:terMode===4?1+(Math.random()*3|0):terMode,ph:+(Math.random()*6.28).toFixed(2)}:null;
-  const ysB=ys2.slice();if(ter)applyTerrain(ys2,ter);
-  G.pl.forEach((q,i)=>{const nx=i===i0&&tx!=null?tx:q.x;if(ys2[nx]>=H-1)hp[i]=0;else if(nx===q.x&&q.hp>0){const dr=ysB[nx]-G.ys[nx];if(dr>30)hp[i]-=Math.min(25,Math.round((dr-30)/4))}hp[i]=Math.max(0,hp[i])});
+  const wrapNow=nx0<=i0&&!(tr.twin&&!G.bonus);
+  let spawn=null;
+  if(crateFreq&&wrapNow&&G.crates.length<3&&Math.random()<[0,.45,1][crateFreq]){
+    const al=G.pl.filter(q=>q.hp>0),q0=al[Math.random()*al.length|0];
+    const cx=Math.round(Math.min(W-20,Math.max(20,q0.x+(Math.random()<.5?-1:1)*(40+Math.random()*90))));
+    {const t0=topY(G.m,cx);if(t0<H-90)spawn={id:++G.cid,x:cx,gy:t0}}
+  }
+  const yAfter=G.pl.map((q,i)=>i===i0&&tx!=null?restM(m2,tx,ty):restM(m2,q.x,q.y));
+  if(ter)shiftM(m2,ter);
+  G.pl.forEach((q,i)=>{
+    const nx=i===i0&&tx!=null?tx:q.x,yF=restM(m2,nx,yAfter[i]);
+    if(yF>=H-1||yAfter[i]>=H-1)hp[i]=0;
+    else if(nx===q.x&&q.hp>0){const dr=yAfter[i]-q.y;if(dr>30)hp[i]-=Math.min(25,Math.round((dr-30)/4))}
+    hp[i]=Math.max(0,hp[i]);
+  });
+  const take=[],gains=[];
+  if(hp[i0]>0&&G.crates.length){
+    const fx=tx!=null?tx:x,lo=Math.min(G.sx,fx)-14,hi=Math.max(G.sx,fx)+14;
+    G.crates.forEach(c=>{
+      if(!(tx!=null?Math.abs(c.x-fx)<16:c.x>=lo&&c.x<=hi)||Math.min(Math.abs(c.gy-(tx!=null?ty:p.y)),Math.abs(c.gy-G.sy))>45)return;
+      take.push(c.id);const r=Math.random();
+      if(r<.5){
+        const wt=WEAPONS.map((w2,j)=>j?3/(w2.cost+1):0);let pk=Math.random()*wt.reduce((a,b)=>a+b,0),j=1;
+        for(;j<WEAPONS.length-1;j++){pk-=wt[j];if(pk<=0)break}
+        gains.push(j);
+      }else if(r<.8)hp[i0]=Math.min(p.maxhp,hp[i0]+60);
+      else sh[i0]=true;
+    });
+  }
   const again=!!tr.twin&&!G.bonus&&hp[i0]>0;
   let next=G.turn;
   for(let g=0;g<(again?0:G.pl.length);g++){
@@ -469,13 +591,13 @@ function hostFire(angle,power,wi,x){
     if(ps[next]>0){hp[next]=Math.max(0,hp[next]-8);ps[next]--;if(hp[next]<=0)continue}
     break;
   }
-  const msg={t:'shot',x,tx,a:angle,pw:power,ps,ter,mids:fl.flatMap((f,pi)=>(f.mids||[]).map(e=>({pi,k:e.k,b:e.b}))),paths:fl.map(f=>f.path),booms:fl.map(f=>f.boom),w:wi,pings,sh,
-    ammo:p.ammo[wi]<0?-1:p.ammo[wi]-1,hp,next,wind:again?G.wind:+(Math.random()*2-1).toFixed(2),again};
+  const msg={t:'shot',x,y:p.y,tx,ty,a:angle,pw:power,ps,ter,cr:{spawn,take,gains},mids:fl.flatMap((f,pi)=>(f.mids||[]).map(e=>({pi,k:e.k,b:e.b}))),paths:fl.map(f=>f.path),booms:fl.map(f=>f.boom),w:wi,pings,sh,
+    ammo:p.ammo[wi]<0?-1:p.ammo[wi]-1,hp,next,wind:again?G.wind:rndWind(),again};
   broadcast(msg);playShot(msg);
 }
-function playShot(m){sfx('fire');G.pl[G.turn].x=m.x;G.anim={m,i:0};G.wait=false}
+function playShot(m){sfx('fire');G.pl[G.turn].x=m.x;G.pl[G.turn].y=m.y;G.anim={m,i:0};G.wait=false}
 function applyBoom(b){
-  if(b.add)bump(G.ys,b.x,b.y,b.r);else if(!b.kind)carve(G.ys,b.x,b.y,b.r);
+  {let bb=null;if(b.add)bb=bumpM(G.m,b.x,b.y,b.r);else if(!b.kind)bb=carveM(G.m,b.x,b.y,b.r);if(bb)paintRect(bb[0],bb[1],bb[2],bb[3]+8)}
   G.fx.push({x:b.x,y:b.y,r:b.r,t:0,c:KC[b.kind]||(b.psn?'#84cc16':b.add?'#a0764a':null)});
   if(!b.nodmg){sfx(b.kind?'heal':'boom');G.shake=Math.max(G.shake||0,b.r/4)}
   G.parts=G.parts||[];
@@ -485,32 +607,40 @@ function finishShot(){
   const m=G.anim.m;
   m.booms.forEach(b=>{if(b)applyBoom(b)});
   (m.mids||[]).forEach(d=>{if(!d.done)applyBoom(d.b)});
-  if(m.ter){applyTerrain(G.ys,m.ter);G.shake=Math.max(G.shake||0,10);sfx('boom')}
-  if(m.tx!=null)G.pl[G.turn].x=m.tx;
+  if(m.ter){shiftM(G.m,m.ter);paintRect(0,0,W-1,H-1);G.shake=Math.max(G.shake||0,10);sfx('boom')}
+  if(m.tx!=null){G.pl[G.turn].x=m.tx;G.pl[G.turn].y=m.ty}
+  settleAll();
   m.pings.forEach(g=>G.fx.push({x:g.x,y:g.y,r:26,t:0,c:g.c}));
   G.pl.forEach((q,i)=>{q.shield=m.sh[i];q.poison=m.ps[i]});
   const s0=G.pl[G.turn];s0.ghost=m.paths;s0.la=m.a;s0.lp=m.pw;s0.lw=m.w;
   if(!G.dm||isHost)s0.ammo[m.w]=m.ammo;
+  if(m.cr){
+    (m.cr.gains||[]).forEach(j=>{if(!G.dm||isHost)s0.ammo[j]++});
+    m.cr.take.forEach(()=>G.msgs.push({txt:'📦 '+s0.name+' grabbed a supply crate',t:0}));
+    G.crates=G.crates.filter(c=>!m.cr.take.includes(c.id));
+    if(m.cr.spawn){G.crates.push(m.cr.spawn);G.msgs.push({txt:'📦 Supply drop incoming!',t:0})}
+  }
   G.pl.forEach((q,i)=>{
     const nh=q.dropped?0:m.hp[i],d=q.hp-nh;
-    if(d!==0)G.floats.push({x:q.x,y:G.ys[q.x]-44,t:0,txt:(d>0?'-':'+')+Math.abs(d),c:d>0?'#f87171':'#4ade80'});
-    if(q.hp>0&&nh<=0){G.msgs.push({txt:'☠ '+q.name+' eliminated',t:0});G.fx.push({x:q.x,y:G.ys[q.x]-10,r:50,t:0,c:'#ff4d4d'});sfx('boom');G.shake=Math.max(G.shake||0,14)}
+    if(d!==0)G.floats.push({x:q.x,y:q.y-44,t:0,txt:(d>0?'-':'+')+Math.abs(d),c:d>0?'#f87171':'#4ade80'});
+    if(q.hp>0&&nh<=0){G.msgs.push({txt:'☠ '+q.name+' eliminated',t:0});G.fx.push({x:q.x,y:q.y-10,r:50,t:0,c:'#ff4d4d'});sfx('boom');G.shake=Math.max(G.shake||0,14)}
     q.hp=nh;
   });
   G.turn=m.next;G.wind=m.wind;G.anim=null;checkOver();scoreGame();G.bonus=!!m.again;
   if(G.over===-1&&G.pl[G.turn].hp<=0)G.turn=nextAlive(G.turn);
   if(isHost&&G.dm&&G.over===-1&&!m.again)turnDraw(G.turn);
+  if(isHost&&G.dm&&m.cr&&m.cr.gains&&m.cr.gains.length)syncHands();
   setAim();if(canAct())sfx('turn');
 }
 function fire(){
   if(!canAct())return;
-  if(isHost)hostFire(G.angle,G.power,G.weapon,G.pl[G.turn].x);
-  else{G.wait=true;hostConn.send({t:'fire',angle:G.angle,power:G.power,w:G.weapon,x:G.pl[G.turn].x})}
+  if(isHost)hostFire(G.angle,G.power,G.weapon,G.pl[G.turn].x,G.pl[G.turn].y);
+  else{G.wait=true;hostConn.send({t:'fire',angle:G.angle,power:G.power,w:G.weapon,x:G.pl[G.turn].x,y:G.pl[G.turn].y})}
 }
 
 /* ---------- networking ---------- */
 function broadcast(m){conns.forEach(c=>c.open&&c.send(m))}
-function broadcastLobby(){fixColors();broadcast({t:'lobby',players:lobby,map:mapStyle,tm:teamMode,sz:mapW,bud:budget,hm:hpSet,tr:terMode,dv:drawVal,tmo:traitMode});renderLobby()}
+function broadcastLobby(){fixColors();broadcast({t:'lobby',players:lobby,map:mapStyle,tm:teamMode,sz:mapW,bud:budget,hm:hpSet,tr:terMode,dv:drawVal,tmo:traitMode,ws:windSet,cf:crateFreq});renderLobby()}
 function renderLobby(){
   show('lobbyscr');
   $('plist').innerHTML=lobby.map((p,i)=>{
@@ -519,13 +649,12 @@ function renderLobby(){
     h+=(mine&&traitMode===0)?` <select data-i="${i}" data-k="trait">${TRAITS.map((t,k)=>`<option value="${k}" ${k===p.trait?'selected':''}>${t.name} - ${t.d}</option>`).join('')}</select>`:(traitMode>0?' <small>trait decided at start</small>':` <small>${TRAITS[p.trait].name}</small>`);
     h+=`<span class="pts ${used>=budget?'full':''}">${used}/${budget} pts</span></div>`;
     if(mine)h+='<div class="wg">'+WEAPONS.map((w,j)=>j?`<div class="wc ${p.load[j]?'on':''}" title="${w.d}"><span><b>${w.name}</b><br><small>${w.cost} pt${w.cost>1?'s':''}</small></span><span class="st"><button class="alt" data-i="${i}" data-w="${j}" data-d="-1">-</button><b>${p.load[j]}</b><button class="alt" data-i="${i}" data-w="${j}" data-d="1">+</button></span></div>`:'').join('')+'</div>';
-    else if(p.bot)h+='<small>Random trait and loadout each game</small>';
     else if(drawVal>0)h+='<small>Deck: '+p.load.reduce((a,b)=>a+b,0)+' cards (hidden)</small>';
     else h+='<div class="chips">'+(WEAPONS.map((w,j)=>p.load[j]?`<span class="chip">${w.name} x${p.load[j]}</span>`:'').join('')||'<small>Shells only</small>')+'</div>';
     return h+'</div>';
   }).join('');
   $('hostbtns').hidden=!isHost;$('code').textContent=code;
-  $('mapsel').value=mapStyle;$('modesel').value=teamMode?1:0;$('szsel').value=mapW;$('budsel').value=budget;$('hpsel').value=hpSet;$('trsel').value=terMode;$('drawsel').value=drawVal;$('traitsel').value=traitMode;
+  $('mapsel').value=mapStyle;$('modesel').value=teamMode?1:0;$('szsel').value=mapW;$('budsel').value=budget;$('hpsel').value=hpSet;$('trsel').value=terMode;$('drawsel').value=drawVal;$('traitsel').value=traitMode;$('windsel').value=windSet;$('cratesel').value=crateFreq;
   $('waitmsg').textContent=(isHost?'Need at least 2 players (max 4). ':'Waiting for the host (map: '+(mapStyle<0?'Random':MAPS[mapStyle])+', '+mapW+'px wide, '+budget+' pts, '+hpSet+'x HP, terrain: '+TERN[terMode]+'). ')+(drawVal?'Deck mode: points buy cards, you draw '+(drawVal>1?'one every '+drawVal+' turns':'one per turn')+', hand limit '+HANDMAX+', 5+ pt weapons max 1 copy, early turns draw light shells only.':'Shells are unlimited; spend points on special ammo.');
   $('start').disabled=lobby.length<2;$('addlocal').disabled=$('addbot').disabled=lobby.length>=4;$('rmlast').disabled=lobby.length<=1||!(lobby[lobby.length-1].bot||lobby[lobby.length-1].owner==='host');
 }
@@ -573,7 +702,7 @@ function hostLobby(){
         if(cost(load)>budget||!TRAITS[d.trait])return;
         e.trait=d.trait|0;e.load=load;broadcastLobby();
       }else if(d.t==='aim'&&G&&canActFor(c.peer)){applyAim(d);conns.forEach(o=>{if(o!==c&&o.open)o.send(d)})
-      }else if(d.t==='fire'&&G&&canActFor(c.peer))hostFire(+d.angle,Math.min(100,Math.max(0,+d.power)),+d.w,+d.x);
+      }else if(d.t==='fire'&&G&&canActFor(c.peer))hostFire(+d.angle,Math.min(100,Math.max(0,+d.power)),+d.w,+d.x,+d.y);
     });
     c.on('close',()=>{conns=conns.filter(x=>x!==c);if(!G){lobby=lobby.filter(p=>p.owner!==c.peer);draft=null;draftData=null;broadcastLobby()}else{dropPlayer(c.peer);broadcast({t:'drop',owner:c.peer})}});
   });
@@ -588,7 +717,7 @@ function joinLobby(){
     myId=id;hostConn=peer.connect('tankarena-'+c);
     hostConn.on('open',()=>hostConn.send({t:'join',name:$('name').value.trim()||'Player',col:myCol,hat:myHat}));
     hostConn.on('data',d=>{
-      if(d.t==='lobby'){G=null;draftData=null;lobby=d.players;mapStyle=d.map;teamMode=!!d.tm;mapW=d.sz||960;budget=d.bud||10;hpSet=d.hm||1;terMode=d.tr||0;drawVal=d.dv||0;traitMode=d.tmo||0;renderLobby()}
+      if(d.t==='lobby'){G=null;draftData=null;lobby=d.players;mapStyle=d.map;teamMode=!!d.tm;mapW=d.sz||960;budget=d.bud||10;hpSet=d.hm||1;terMode=d.tr||0;drawVal=d.dv||0;traitMode=d.tmo||0;windSet=d.ws==null?1:d.ws;crateFreq=d.cf==null?1:d.cf;renderLobby()}
       else if(d.t==='start')startGame(d);
       else if(d.t==='shot'&&G)playShot(d);
       else if(d.t==='drop')dropPlayer(d.owner);
@@ -640,6 +769,10 @@ $('dlist').onclick=e=>{
 $('dauto').onclick=()=>{if(draft){draft.picks=draft.picks.map((x,i)=>x==null?draft.offers[i][Math.random()*4|0]:x);sendDraft()}};
 $('dcancel').onclick=()=>{draft=null;draftData=null;broadcastLobby()};
 $('traitsel').innerHTML=['Traits: free choice','Traits: pick 1 of 4 random','Traits: assigned randomly'].map((n,i)=>`<option value="${i}">${n}</option>`).join('');
+$('windsel').innerHTML=[['none',0],['light',.5],['normal',1],['strong',2],['hurricane',3]].map(([n,v])=>`<option value="${v}">Wind: ${n}</option>`).join('');
+$('windsel').onchange=()=>{windSet=+$('windsel').value;broadcastLobby()};
+$('cratesel').innerHTML=['Supply drops: off','Supply drops: occasional','Supply drops: every round'].map((n,i)=>`<option value="${i}">${n}</option>`).join('');
+$('cratesel').onchange=()=>{crateFreq=+$('cratesel').value;broadcastLobby()};
 $('traitsel').onchange=()=>{traitMode=+$('traitsel').value;broadcastLobby()};
 $('start').onclick=()=>{
   if(traitMode===1){startDraft();return}
@@ -647,17 +780,16 @@ $('start').onclick=()=>{
   beginGame();
 };
 function beginGame(){
-  lobby.forEach(e=>{if(e.bot){if(traitMode===0)e.trait=Math.random()*TRAITS.length|0;e.load=randLoad()}});
   const n=lobby.length,slots=[...Array(n).keys()].map(i=>Math.round(mapW*(i+1)/(n+1)));
   for(let i=n-1;i>0;i--){const j=Math.random()*(i+1)|0;[slots[i],slots[j]]=[slots[j],slots[i]]}
-  const m={t:'start',seed:Math.random()*1e9|0,turn:0,tm:teamMode,W:mapW,hpm:hpSet,dm:drawVal>0?1:0,map:mapStyle<0?Math.random()*MAPS.length|0:mapStyle,wind:+(Math.random()*2-1).toFixed(2),
+  const m={t:'start',seed:Math.random()*1e9|0,turn:0,tm:teamMode,W:mapW,hpm:hpSet,dm:drawVal>0?1:0,map:mapStyle<0?Math.random()*MAPS.length|0:mapStyle,wind:rndWind(),
            players:lobby.map((p,i)=>({name:p.name,owner:p.owner,x:slots[i],trait:p.trait,load:p.load,col:p.col,hat:p.hat}))};
   broadcast(m);startGame(m);if(G.dm)initDraw();
 }
-$('addbot').onclick=()=>{if(lobby.length<4){lobby.push(Object.assign(mk('Bot '+(lobby.filter(e=>e.bot).length+1),'bot'),{bot:1,col:null}));broadcastLobby()}};
+$('addbot').onclick=()=>{if(lobby.length<4){lobby.push(Object.assign(mk('Bot '+(lobby.filter(e=>e.bot).length+1),'bot'),{bot:1,col:null,trait:Math.random()*TRAITS.length|0,load:randLoad()}));broadcastLobby()}};
 $('rmlast').onclick=()=>{const e=lobby[lobby.length-1];if(lobby.length>1&&(e.bot||e.owner==='host')){lobby.pop();broadcastLobby()}};
 $('resetsc').onclick=()=>{lobby.forEach(e=>e.wins=0);broadcastLobby()};
-$('newgame').onclick=()=>{G=null;broadcastLobby()};
+$('newgame').onclick=()=>{G=null;lobby.forEach(e=>{if(e.bot){e.trait=Math.random()*TRAITS.length|0;e.load=randLoad()}});broadcastLobby()};
 $('fire').onclick=fire;$('mute').onclick=()=>{muted=!muted;$('mute').textContent=muted?'🔇':'🔊'};$('mvl').onclick=()=>move(-4);$('mvr').onclick=()=>move(4);
 $('wbar').onclick=e=>{const i=e.target.dataset.w;if(i!=null)pickW(+i)};
 $('copylink').onclick=async()=>{
@@ -684,8 +816,8 @@ const cv=$('cv'),ctx=cv.getContext('2d');
 function aimFromPointer(e){
   if(!canAct())return;
   const r=cv.getBoundingClientRect(),sx=(e.clientX-r.left)*960/r.width,sy=(e.clientY-r.top)*540/r.height,mx=cam.x+(sx-480)/cam.z,my=cam.y+(sy-270)/cam.z;
-  const p=G.pl[G.turn],dx=mx-p.x,dy=G.ys[p.x]-12-my;
-  G.angle=Math.min(180,Math.max(0,Math.atan2(dy,dx)*180/Math.PI));
+  const p=G.pl[G.turn],dx=mx-p.x,dy=p.y-12-my;
+  {let a=Math.atan2(dy,dx)*180/Math.PI;if(a<-90)a+=360;G.angle=a}
   G.power=Math.min(100,Math.hypot(dx,dy)/2.5);
 }
 cv.addEventListener('pointerdown',e=>{if(e.button===0)aimFromPointer(e)});
@@ -707,8 +839,8 @@ addEventListener('keydown',e=>{
   if(/^Digit[1-9]$/.test(e.code)){pickW(+e.code.slice(5)-1);return}
   if(!canAct())return;
   const s=e.shiftKey?5:1;
-  if(e.code==='ArrowLeft')G.angle=Math.min(180,G.angle+s);
-  if(e.code==='ArrowRight')G.angle=Math.max(0,G.angle-s);
+  if(e.code==='ArrowLeft')G.angle=Math.min(269,G.angle+s);
+  if(e.code==='ArrowRight')G.angle=Math.max(-89,G.angle-s);
   if(e.code==='ArrowUp')G.power=Math.min(100,G.power+s);
   if(e.code==='ArrowDown')G.power=Math.max(0,G.power-s);
 });
@@ -730,12 +862,9 @@ function draw(){
   ctx.save();ctx.translate(480,270);ctx.scale(cam.z,cam.z);ctx.translate(-cam.x,-cam.y);
   ctx.fillStyle='#2a1208';ctx.fillRect(-2000,H,W+4000,2000);ctx.fillRect(-2000,-2000,2000,4000);ctx.fillRect(W,-2000,2000,4000);
   const lg=ctx.createLinearGradient(0,H-45,0,H);lg.addColorStop(0,'#ff7a1a');lg.addColorStop(1,'#a01800');ctx.fillStyle=lg;ctx.fillRect(0,H-40,W,40);
-  ctx.beginPath();ctx.moveTo(0,H);for(let x=0;x<W;x++)ctx.lineTo(x,G.ys[x]);ctx.lineTo(W,H);ctx.closePath();
-  const tg=ctx.createLinearGradient(0,150,0,H);tg.addColorStop(0,'#5b8c3a');tg.addColorStop(.15,'#6b4a2b');tg.addColorStop(1,'#3a2918');
-  ctx.fillStyle=tg;ctx.fill();
-  const cur=G.pl[G.turn];
+  if(TC)ctx.drawImage(TC,0,0);
   G.pl.forEach((p,i)=>{
-    const y=G.ys[p.x];
+    const y=p.y;
     if(p.hp<=0){ctx.fillStyle='#555';ctx.fillRect(p.x-12,y-8,24,8);return}
     if(i===G.turn&&G.over===-1){ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(p.x,y-48);ctx.lineTo(p.x-6,y-58);ctx.lineTo(p.x+6,y-58);ctx.fill()}
     const a=(i===G.turn&&!G.anim?G.angle:p.lastAngle??(p.x<W/2?55:125))*Math.PI/180;
@@ -747,6 +876,13 @@ function draw(){
     if(G.dm&&p.hn){ctx.fillStyle='#fde68a';ctx.fillText('🃏'+p.hn,p.x-22,y-18)}
     ctx.fillStyle='#fff';ctx.font='11px system-ui';ctx.textAlign='center';ctx.fillText(p.name,p.x,y-36);
   });
+  G.crates.forEach(c=>{
+    const gy=c.gy-9;if(c.y==null)c.y=-40;
+    const fall=c.y<gy-1;c.y=Math.min(gy,c.y+5);
+    if(fall){ctx.strokeStyle='#e5e7eb';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(c.x,c.y-14,13,Math.PI,0);ctx.moveTo(c.x-13,c.y-14);ctx.lineTo(c.x-5,c.y-4);ctx.moveTo(c.x+13,c.y-14);ctx.lineTo(c.x+5,c.y-4);ctx.stroke()}
+    ctx.fillStyle='#b8832f';ctx.fillRect(c.x-8,c.y-7,16,14);ctx.strokeStyle='#5c3b0e';ctx.lineWidth=2;ctx.strokeRect(c.x-8,c.y-7,16,14);
+    ctx.fillStyle='#fff';ctx.font='bold 11px system-ui';ctx.textAlign='center';ctx.fillText('?',c.x,c.y+4);
+  });
   const gh=cur.ghost;
   if(gh&&!G.anim&&G.over===-1){
     ctx.save();ctx.setLineDash([3,7]);ctx.strokeStyle='rgba(255,255,255,.3)';ctx.lineWidth=1.5;
@@ -755,9 +891,9 @@ function draw(){
   }
   if(canAct()){
     const a=G.angle*Math.PI/180,sp=WEAPONS[G.weapon].straight?12:G.power*.16;
-    let x=cur.x+Math.cos(a)*16,y=G.ys[cur.x]-12-Math.sin(a)*16,vx=Math.cos(a)*sp,vy=-Math.sin(a)*sp;
+    let x=cur.x+Math.cos(a)*16,y=cur.y-12-Math.sin(a)*16,vx=Math.cos(a)*sp,vy=-Math.sin(a)*sp;
     ctx.fillStyle='rgba(255,255,255,.55)';const ww=WEAPONS[G.weapon].nowind?0:G.wind;
-    for(let i=0;i<60;i++){vx+=ww*.02;vy+=WEAPONS[G.weapon].straight?0:.12;x+=vx;y+=vy;if(i%4===3){ctx.beginPath();ctx.arc(x,y,1.8,0,7);ctx.fill()}}
+    for(let i=0;i<60;i++){vx+=ww*.02;vy+=WEAPONS[G.weapon].straight?0:WEAPONS[G.weapon].phantom?-.12:.12;x+=vx;y+=vy;if(i%4===3){ctx.beginPath();ctx.arc(x,y,1.8,0,7);ctx.fill()}}
   }
   if(G.anim){
     ctx.fillStyle='#fff';

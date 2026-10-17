@@ -79,24 +79,24 @@ small{color:#8d97ad}
 let W=960;
 const H=540,COL=['#ef4444','#3b82f6','#22c55e','#eab308'];
 const WEAPONS=[
- {d:'Standard shell. Unlimited.',name:'Shell',r:40,dmg:35,cost:0,tags:['shell']},
- {d:'Large blast, heavy damage.',name:'Big Bomb',r:65,dmg:55,cost:3,tags:['explosive']},
- {d:'Splits into 3 shells at the top of its arc.',name:'Splitter',r:28,dmg:22,cost:2,split:1,tags:['explosive','cluster']},
- {d:'Explodes on landing and again on each of 2 bounces.',name:'Bouncer',r:34,dmg:30,cost:2,bounce:2,tags:['bounce']},
- {d:'Marks a spot, then 3 bombs drop from the sky around it.',name:'Airstrike',r:30,dmg:22,cost:3,strike:1,tags:['explosive','air']},
- {d:'Piles up terrain where it lands. Build cover or fill pits.',name:'Dirt Ball',r:65,dmg:0,cost:1,add:1,tags:['earth']},
- {d:'Heals every tank near the impact (enemies too!).',name:'Repair Shell',kind:'heal',r:50,dmg:0,heal:75,cost:2,tags:['support']},
- {d:'Tanks near the impact take 60% less damage until their next turn.',name:'Shield Shell',kind:'shield',r:60,dmg:0,cost:2,tags:['support']},
- {d:'You teleport to where it lands.',name:'Teleport Shell',kind:'tele',r:20,dmg:0,cost:2,tags:['support']},
- {d:'Enormous blast, the heaviest single hit in the game.',name:'Nuke',r:100,dmg:75,cost:6,tags:['explosive']},
- {d:'Fires 3 shells in a small fan.',name:'Triple Shot',r:28,dmg:22,cost:3,multi:1,tags:['multi']},
- {d:'Rolls along the ground after landing, exploding on contact or at a steep slope.',name:'Roller',r:38,dmg:40,cost:2,roll:1,tags:['rolling']},
- {d:'You heal for 60% of the damage you deal.',name:'Vampire Shell',r:35,dmg:38,cost:3,vamp:1,tags:['vampire']},
- {d:'Splits into 5 small bomblets at the top of its arc.',name:'Cluster Bomb',r:22,dmg:18,cost:3,split:1,kids:5,tags:['explosive','cluster']},
- {d:'Flies perfectly straight: no arc, no wind, fixed speed. Pierces thin terrain.',name:'Sniper Shell',r:14,dmg:60,cost:2,nowind:1,straight:1,pierce:80,tags:['precision']},
- {d:'Poisons tanks in the cloud: 8 damage per turn for 3 turns.',name:'Poison Shell',r:34,dmg:15,cost:2,psn:1,tags:['poison']},
- {d:'Really bores through terrain (about 480px), through hills and out the other side, carving a real tunnel behind it. Explodes on a tank, after a gap of open air, or when it runs out.',name:'Drill',r:45,dmg:50,cost:3,drill:480,tags:['drill']},
- {d:'Ghost shell: passes through terrain and arcs UPWARD (reverse gravity). It only explodes when it reaches a tank, otherwise it flies away.',name:'Phantom Shot',r:42,dmg:50,cost:3,phantom:1,tags:['phantom']}
+ {d:'Standard shell. Unlimited.',name:'Shell',e:'⚪',r:40,dmg:35,cost:0,tags:['shell']},
+ {d:'Large blast, heavy damage.',name:'Big Bomb',e:'💣',r:65,dmg:55,cost:3,tags:['explosive']},
+ {d:'Splits into 3 shells at the top of its arc.',name:'Splitter',e:'✴️',r:28,dmg:22,cost:2,split:1,tags:['explosive','cluster']},
+ {d:'Explodes on landing and again on each of 2 bounces.',name:'Bouncer',e:'🏀',r:34,dmg:30,cost:2,bounce:2,tags:['bounce']},
+ {d:'Marks a spot, then 3 bombs drop from the sky around it.',name:'Airstrike',e:'✈️',r:30,dmg:22,cost:3,strike:1,tags:['explosive','air']},
+ {d:'Piles up terrain where it lands. Build cover or fill pits.',name:'Dirt Ball',e:'🟤',r:65,dmg:0,cost:1,add:1,tags:['earth']},
+ {d:'Heals every tank near the impact (enemies too!).',name:'Repair Shell',e:'🔧',kind:'heal',r:50,dmg:0,heal:75,cost:2,tags:['support']},
+ {d:'Tanks near the impact take 60% less damage until their next turn.',name:'Shield Shell',e:'🛡️',kind:'shield',r:60,dmg:0,cost:2,tags:['support']},
+ {d:'You teleport to where it lands.',name:'Teleport Shell',e:'🌀',kind:'tele',r:20,dmg:0,cost:2,tags:['support']},
+ {d:'Enormous blast, the heaviest single hit in the game.',name:'Nuke',e:'☢️',r:100,dmg:75,cost:6,tags:['explosive']},
+ {d:'Fires 3 shells in a small fan.',name:'Triple Shot',e:'🔱',r:28,dmg:22,cost:3,multi:1,tags:['multi']},
+ {d:'Rolls along the ground after landing, exploding on contact or at a steep slope.',name:'Roller',e:'🎳',r:38,dmg:40,cost:2,roll:1,tags:['rolling']},
+ {d:'You heal for 60% of the damage you deal.',name:'Vampire Shell',e:'🧛',r:35,dmg:38,cost:3,vamp:1,tags:['vampire']},
+ {d:'Splits into 5 small bomblets at the top of its arc.',name:'Cluster Bomb',e:'🎆',r:22,dmg:18,cost:3,split:1,kids:5,tags:['explosive','cluster']},
+ {d:'Flies perfectly straight: no arc, no wind, fixed speed. Pierces thin terrain.',name:'Sniper Shell',e:'🎯',r:14,dmg:60,cost:2,nowind:1,straight:1,pierce:80,tags:['precision']},
+ {d:'Poisons tanks in the cloud: 8 damage per turn for 3 turns.',name:'Poison Shell',e:'☠️',r:34,dmg:15,cost:2,psn:1,tags:['poison']},
+ {d:'Really bores through terrain (about 480px), through hills and out the other side, carving a real tunnel behind it. Explodes on a tank, after a gap of open air, or when it runs out.',name:'Drill',e:'⛏️',r:45,dmg:50,cost:3,drill:480,tags:['drill']},
+ {d:'Ghost shell: passes through terrain and arcs UPWARD (reverse gravity). It only explodes when it reaches a tank, otherwise it flies away.',name:'Phantom Shot',e:'👻',r:42,dmg:50,cost:3,phantom:1,tags:['phantom']}
 ];
 /* Traits: global (hp,fuel,gdmg,armor) and/or weapon-tag based (tag + dmg/r/free) */
 const TRAITS=[
@@ -226,7 +226,7 @@ function buildMask(seed,st){
       if(dx*dx+dy*dy<1+.18*Math.sin(Math.atan2(y-cy,x-cx)*3+ph))m[y*W+x]=1;
     }
   };
-  if(st===11){const n=Math.max(5,Math.round(W/170));for(let i=0;i<n;i++)blob(W*(i+.5)/n+(r()-.5)*40,190+r()*200,60+r()*50,22+r()*14,r()*6.28)}
+  if(st===11){const n=Math.max(5,Math.round(W/170));for(let i=0;i<n;i++)blob(W*(i+.5)/n+(r()-.5)*40,190+r()*190,75+r()*55,28+r()*16,r()*6.28)}
   if(st===12){
     const ty=Math.round(H*.8)-26;
     for(let x=Math.round(W*.2);x<=Math.round(W*.8);x+=5)carveM(m,x,ty,26);
@@ -285,7 +285,7 @@ function startGame(m){
      angle:0,power:50,weapon:0,tm:m.tm,dm:m.dm,anim:null,fx:[],floats:[],msgs:[],crates:[],cid:0,over:-1,wait:false};
   G.pl.forEach(p=>{
     const x0=p.x;let best=null;
-    for(let d=0;d<W&&best==null;d+=4)for(const sx of[x0+d,x0-d])if(sx>=30&&sx<W-30&&topY(G.m,sx)<H-90){best=sx;break}
+    for(let d=0;d<W&&best==null;d+=4)for(const sx of[x0+d,x0-d])if(sx>=30&&sx<W-30&&topY(G.m,sx)<H-90&&solid(sx,topY(G.m,sx)+45)){best=sx;break}
     p.x=best==null?x0:best;const L=Math.min(topY(G.m,p.x),H-80);flatten(G.m,p.x,L);p.y=L;
   });paintAll();setAim();show('gamescr');$('newgame').hidden=!isHost;
 }
@@ -340,7 +340,7 @@ function sfx(k){
       const s=AC.createBufferSource(),f=AC.createBiquadFilter();f.type='lowpass';f.frequency.value=600;
       s.buffer=b;s.connect(f);f.connect(g);g.gain.value=.7;s.start(t);
     }else{
-      const o=AC.createOscillator(),sw={fire:[700,200,.25],heal:[400,900,.3],turn:[500,500,.12]}[k]||[400,400,.1];
+      const o=AC.createOscillator(),sw={fire:[700,200,.25],heal:[400,900,.3],turn:[500,500,.12],thud:[120,50,.18]}[k]||[400,400,.1];
       o.type=k==='fire'?'sawtooth':'sine';o.connect(g);
       o.frequency.setValueAtTime(sw[0],t);o.frequency.exponentialRampToValueAtTime(sw[1],t+sw[2]);
       g.gain.setValueAtTime(.15,t);g.gain.exponentialRampToValueAtTime(.001,t+sw[2]);
@@ -421,8 +421,8 @@ function applySkip(m){G.bonus=false;G.turn=m.next;G.wind=m.wind;G.pl[G.turn].shi
 function renderW(){
   const p=G.pl[G.turn];
   if(G.dm&&p.owner!==myId){$('wbar').innerHTML=`<small>${esc(p.name)} holds ${p.hn||0} special shell(s)</small>`;return}
-  $('wbar').innerHTML=WEAPONS.map((w,i)=>(G.dm&&p.ammo[i]===0)||(G.bonus&&i>0)?'':`<button class="${i===G.weapon?'':'alt'}" ${p.ammo[i]===0?'disabled':''} data-w="${i}" title="${w.d}">${i+1} ${w.name}${p.ammo[i]>=0?' x'+p.ammo[i]:''}</button>`).join('')
-    +(G.dm?`<small>${drawVal>1?'draws every '+drawVal+' turns':'draws each turn'}</small>`:'')+(G.bonus?'<small>Double Tap bonus shot: Shell only, 60% damage</small>':'')+`<div style="width:100%"><small>${WEAPONS[G.weapon].d}</small></div>`;
+  $('wbar').innerHTML=WEAPONS.map((w,i)=>(G.dm&&p.ammo[i]===0)||(G.bonus&&i>0)?'':`<button class="${i===G.weapon?'':'alt'}" ${p.ammo[i]===0?'disabled':''} data-w="${i}" title="${w.name}: ${w.d}">${i<9?i+1+' ':''}${w.e}${p.ammo[i]>=0?' ×'+p.ammo[i]:''}</button>`).join('')
+    +(G.dm?`<small>${drawVal>1?'draws every '+drawVal+' turns':'draws each turn'}</small>`:'')+(G.bonus?'<small>Double Tap bonus shot: Shell only, 60% damage</small>':'')+`<div style="width:100%"><small><b>${WEAPONS[G.weapon].e} ${WEAPONS[G.weapon].name}</b>: ${WEAPONS[G.weapon].d}</small></div>`;
 }
 function move(dx){
   if(!canAct())return;
@@ -608,7 +608,7 @@ function finishShot(){
   m.booms.forEach(b=>{if(b)applyBoom(b)});
   (m.mids||[]).forEach(d=>{if(!d.done)applyBoom(d.b)});
   if(m.ter){shiftM(G.m,m.ter);paintRect(0,0,W-1,H-1);G.shake=Math.max(G.shake||0,10);sfx('boom')}
-  if(m.tx!=null){G.pl[G.turn].x=m.tx;G.pl[G.turn].y=m.ty}
+  if(m.tx!=null){G.pl[G.turn].x=m.tx;G.pl[G.turn].y=m.ty;G.pl[G.turn].dy=m.ty}
   settleAll();
   m.pings.forEach(g=>G.fx.push({x:g.x,y:g.y,r:26,t:0,c:g.c}));
   G.pl.forEach((q,i)=>{q.shield=m.sh[i];q.poison=m.ps[i]});
@@ -648,7 +648,7 @@ function renderLobby(){
     let h=`<div class="pc"><div class="ph"><span class="dot" style="background:${teamMode?COL[i%2]:PAL[p.col??i]}"></span><b>${esc(p.name)}</b>${you?' (you)':''}${p.wins?` <span class="chip">🏆 ${p.wins}</span>`:''}`;
     h+=(mine&&traitMode===0)?` <select data-i="${i}" data-k="trait">${TRAITS.map((t,k)=>`<option value="${k}" ${k===p.trait?'selected':''}>${t.name} - ${t.d}</option>`).join('')}</select>`:(traitMode>0?' <small>trait decided at start</small>':` <small>${TRAITS[p.trait].name}</small>`);
     h+=`<span class="pts ${used>=budget?'full':''}">${used}/${budget} pts</span></div>`;
-    if(mine)h+='<div class="wg">'+WEAPONS.map((w,j)=>j?`<div class="wc ${p.load[j]?'on':''}" title="${w.d}"><span><b>${w.name}</b><br><small>${w.cost} pt${w.cost>1?'s':''}</small></span><span class="st"><button class="alt" data-i="${i}" data-w="${j}" data-d="-1">-</button><b>${p.load[j]}</b><button class="alt" data-i="${i}" data-w="${j}" data-d="1">+</button></span></div>`:'').join('')+'</div>';
+    if(mine)h+='<div class="wg">'+WEAPONS.map((w,j)=>j?`<div class="wc ${p.load[j]?'on':''}" title="${w.d}"><span><b>${w.e} ${w.name}</b><br><small>${w.cost} pt${w.cost>1?'s':''}</small></span><span class="st"><button class="alt" data-i="${i}" data-w="${j}" data-d="-1">-</button><b>${p.load[j]}</b><button class="alt" data-i="${i}" data-w="${j}" data-d="1">+</button></span></div>`:'').join('')+'</div>';
     else if(drawVal>0)h+='<small>Deck: '+p.load.reduce((a,b)=>a+b,0)+' cards (hidden)</small>';
     else h+='<div class="chips">'+(WEAPONS.map((w,j)=>p.load[j]?`<span class="chip">${w.name} x${p.load[j]}</span>`:'').join('')||'<small>Shells only</small>')+'</div>';
     return h+'</div>';
@@ -863,8 +863,15 @@ function draw(){
   ctx.fillStyle='#2a1208';ctx.fillRect(-2000,H,W+4000,2000);ctx.fillRect(-2000,-2000,2000,4000);ctx.fillRect(W,-2000,2000,4000);
   const lg=ctx.createLinearGradient(0,H-45,0,H);lg.addColorStop(0,'#ff7a1a');lg.addColorStop(1,'#a01800');ctx.fillStyle=lg;ctx.fillRect(0,H-40,W,40);
   if(TC)ctx.drawImage(TC,0,0);
+  const cur=G.pl[G.turn];
   G.pl.forEach((p,i)=>{
-    const y=p.y;
+    if(p.dy==null)p.dy=p.y;
+    {const dd=p.y-p.dy;
+     if(dd>0.5){p.vf=(p.vf||0)+.55;p.dy=Math.min(p.y,p.dy+p.vf);
+       if(p.dy>=p.y){if(p.vf>5){G.shake=Math.max(G.shake||0,Math.min(10,p.vf));sfx('thud')}
+         G.parts=G.parts||[];for(let k=0;k<6;k++)G.parts.push({x:p.x,y:p.y,vx:(Math.random()-.5)*3,vy:-Math.random()*2.5,l:20});p.vf=0}}
+     else{p.vf=0;p.dy+=dd*.3}}
+    const y=p.dy;
     if(p.hp<=0){ctx.fillStyle='#555';ctx.fillRect(p.x-12,y-8,24,8);return}
     if(i===G.turn&&G.over===-1){ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(p.x,y-48);ctx.lineTo(p.x-6,y-58);ctx.lineTo(p.x+6,y-58);ctx.fill()}
     const a=(i===G.turn&&!G.anim?G.angle:p.lastAngle??(p.x<W/2?55:125))*Math.PI/180;
@@ -913,8 +920,12 @@ function draw(){
   G.msgs.slice(-4).forEach((m,k)=>{ctx.globalAlpha=Math.min(1,(300-m.t)/60);ctx.fillStyle='#fff';ctx.fillText(m.txt,12,46+k*18);ctx.globalAlpha=1});
   ctx.textAlign='left';ctx.fillStyle='#fff';ctx.font='15px system-ui';
   const w=G.wind;
-  ctx.fillText(G.over===-1?`${cur.name}'s turn   ${WEAPONS[G.weapon].name}   Angle ${G.angle.toFixed(0)}°   Power ${WEAPONS[G.weapon].straight?'-':G.power.toFixed(0)}   Fuel ${G.fuel}   Time ${Math.max(0,Math.ceil((TURN_MS-(performance.now()-G.t0))/1000))}`:'',12,22);
-  ctx.textAlign='right';ctx.fillText(`Wind ${w<0?'◀':'▶'} ${Math.abs(w*10).toFixed(1)}`,948,22);
+  ctx.fillText(G.over===-1?`${cur.name}'s turn [${TRAITS[cur.trait].name}]   ${WEAPONS[G.weapon].e} ${WEAPONS[G.weapon].name}   Angle ${G.angle.toFixed(0)}°   Power ${WEAPONS[G.weapon].straight?'-':G.power.toFixed(0)}   Fuel ${G.fuel}   Time ${Math.max(0,Math.ceil((TURN_MS-(performance.now()-G.t0))/1000))}`:'',12,22);
+  {const L=Math.min(70,Math.abs(w)*28),cx0=800,cy0=17,dir=w<0?-1:1;
+  ctx.strokeStyle=ctx.fillStyle=L>2?'#fff':'#9ca3af';ctx.lineWidth=3;
+  if(L>2){ctx.beginPath();ctx.moveTo(cx0-dir*L/2,cy0);ctx.lineTo(cx0+dir*L/2,cy0);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(cx0+dir*L/2,cy0);ctx.lineTo(cx0+dir*(L/2-9),cy0-6);ctx.lineTo(cx0+dir*(L/2-9),cy0+6);ctx.fill()}
+  ctx.textAlign='right';ctx.fillText('Wind '+Math.abs(w*10).toFixed(1),948,22)}
   if(G.over!==-1){
     ctx.textAlign='center';ctx.font='bold 40px system-ui';ctx.fillStyle='#fff';
     ctx.fillText(G.over===-2?'Draw!':G.tm?'Team '+TN[G.pl[G.over].team]+' wins!':G.pl[G.over].name+' wins!',480,270);
